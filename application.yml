@@ -1,0 +1,6 @@
+server:
+  port: 18089  #服务端口
+  host: 0.0.0.0 #监听所有网络接口
+  logger:
+#    file: logs/app.log
+    level: DEBUG # 日志级别: CRITICAL, ERROR, WARNING, INFO, DEBUG
