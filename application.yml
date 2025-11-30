@@ -4,3 +4,11 @@ server:
   logger:
 #    file: logs/app.log
     level: DEBUG # 日志级别: CRITICAL, ERROR, WARNING, INFO, DEBUG
+
+db:
+  url: "mysql+pymysql://root:itcast321bca@192.168.150.101:3306/agent_center?charset=utf8mb4&connect_timeout=10"
+  pool_size: 10           # 连接池大小
+  max_overflow: 20        # 超出连接池的最大连接数
+  pool_timeout: 30        # 池中无连接时的等待时间
+  pool_recycle: 1800      # 连接回收时间（秒）
+  echo: True               # 控制台输出 SQL
