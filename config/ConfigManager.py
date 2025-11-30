@@ -1,6 +1,7 @@
 from typing import Dict, Any
 import os
 from util import YamlLoader, get_project_root
+from common import *
 
 
 class ConfigManager:
@@ -16,10 +17,6 @@ class ConfigManager:
 
     _instance = None
     _config = None  # 存储加载后的全局配置字典
-
-    # 一些常用配置名常量
-    SERVER_PORT = "server.port"
-    SERVER_HOST = "server.host"
 
     def __new__(cls):
         """单例模式实现，确保全局仅有一个 ConfigManager 实例"""
@@ -99,5 +96,5 @@ config_manager = ConfigManager()
 config_manager.load_config()
 
 if __name__ == "__main__":
-    print(config_manager.get("server.port"))
-    print(config_manager.get("server.logger.level"))
+    print(config_manager.get(SERVER_PORT))
+    print(config_manager.get(SERVER_HOST))

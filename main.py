@@ -2,6 +2,7 @@ import asyncio
 import selectors
 import uvicorn
 from config import config_manager  # 配置管理器
+from common import *
 from web import app  # FastAPI 应用实例
 
 # ========================= 异步主入口 =========================
@@ -13,8 +14,8 @@ async def main():
 async def start_web():
     """启动 FastAPI Web 服务"""
     # 获取配置中的 host 和 port
-    host = config_manager.get(config_manager.SERVER_HOST)
-    port = int(config_manager.get(config_manager.SERVER_PORT))
+    host = config_manager.get(SERVER_HOST)
+    port = int(config_manager.get(SERVER_PORT))
 
     # 创建 uvicorn 配置
     config = uvicorn.Config(
