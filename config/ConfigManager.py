@@ -1,5 +1,6 @@
 from typing import Dict, Any
-import os
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from util import YamlLoader, get_project_root
 from common import *
 

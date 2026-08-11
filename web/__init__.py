@@ -1,1 +1,4 @@
-from .WebApp import app
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from WebApp import app

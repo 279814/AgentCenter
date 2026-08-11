@@ -2,7 +2,8 @@ from contextlib import contextmanager
 from typing import Callable, Generator, TypeVar
 
 from sqlalchemy.orm import scoped_session
-
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import SessionLocal, logger
 
 T = TypeVar('T')  # 泛型类型，用于 _execute 方法的返回值类型提示

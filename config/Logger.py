@@ -1,7 +1,8 @@
 # ---------------- 导入库 ----------------
 import logging  # Python 内置日志库
-import os       # 用于路径操作
-from config import config_manager  # 全局配置管理器
+import os, sys       # 用于路径操作
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from ConfigManager import config_manager
 
 # ---------------- 获取项目路径 ----------------
 current_file_path = os.path.abspath(__file__)           # 当前文件绝对路径
