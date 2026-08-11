@@ -1,5 +1,8 @@
 from fastapi import FastAPI, Request
 from starlette.responses import PlainTextResponse
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from routers import auth_router
 
 # ========================= 创建 FastAPI 实例 =========================
 app = FastAPI(
@@ -21,3 +24,7 @@ def system_exception_handler(req: Request, exc: Exception):
 
 # 添加全局异常处理器
 app.add_exception_handler(Exception, system_exception_handler)
+
+# ========================= 路由注册 =========================
+# 将各个子路由模块挂载到不同前缀下
+app.include_router(router=auth_router, prefix="/auth", tags=["auth"])
