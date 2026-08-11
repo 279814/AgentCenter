@@ -17,3 +17,7 @@ async def create_session(n: int, agent_id: int, user_id: int):
     - user_id: 用户ID
     """
     return chat_session_dao.create_session(n, agent_id, user_id)
+
+@session_router.get("/hot")
+async def hot_examples(n: int, agent_id: int):
+    return chat_session_dao.hot_examples(n, agent_id)
