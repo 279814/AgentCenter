@@ -6,7 +6,11 @@ sys.path.insert(0, os.path.dirname(root_path))
 sys.path.insert(0, model_file_path)
 sys.path.insert(0, root_path)
 
-from typing import Optional
+import uuid
+import asyncio
+from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
+from typing import Optional, AsyncIterable
 
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -31,7 +35,7 @@ class RouterAgent(BaseAgent):
     """
 
     # 声明用于 Graph 的所有节点智能体（节点 = 子 Agent）
-    INTENT_MAPS = {
+    AGENTS = {
         "intent_agent": IntentAgent(),
         "recommend_agent": RecommendAgent(),
         "buy_agent": BuyAgent(),
@@ -60,7 +64,7 @@ class RouterAgent(BaseAgent):
         builder = StateGraph(RouteState)  # RouteState 用于定义 Graph 中的状态结构
 
         # 添加所有节点到 Graph（每个节点绑定对应智能体的 execute()）
-        for name, agent in self.INTENT_MAPS.items():
+        for name, agent in self.AGENTS.items():
             builder.add_node(name, agent.execute)
 
         # 设置图的起点：首先进入意图识别
@@ -83,7 +87,53 @@ class RouterAgent(BaseAgent):
         self.graph = builder.compile()
 
     async def execute(self, question: str, session_id: str, user_token: str) -> AsyncIterable[str]:
-        pass
+        try:
+            request_id = uuid.uuid4().hex
+
+            # 构建 Graph 执行上下文
+            config = RunnableConfig(configurable={
+                "thread_id": session_id,
+                "user_token": user_token,  # 将自定义参数传递给子智能体
+                "request_id": request_id  # 将自定义参数传递给子智能体
+            })
+
+            # 用户输入封装
+            inputs = {"messages": HumanMessage(question)}
+
+            # 开始图的流式执行
+            res = self.graph.astream(
+                input=inputs,
+                config=config,
+                subgraphs=True,  # 需要得到子图的输出
+                stream_mode="messages",
+            )
+
+            try:
+                async for node_info, (message, metadata) in res:
+                    # 获取消息 tags（例如 IntentAgent）
+                    tags = metadata.get("tags", [])
+
+                    # 主动跳过 IntentAgent 阶段输出
+                    if "IntentAgent" in tags:
+                        continue
+
+                    # 提取 message 内容
+                    content = getattr(message, "content", None)
+                    if not content:
+                        continue
+                    # SSE 输出文本事件
+                    yield make_sse_event(1001, content)
+            except asyncio.CancelledError:
+                # 客户端中断，也需要安全关闭流
+                await res.aclose()
+                raise
+
+        except Exception as e:
+            logger.exception("RouterAgent error")
+            yield make_sse_event(2001, str(e))
+
+        # SSE 最终停止事件（前端用于关闭流）
+        yield format_sse_data(STOP_EVENT)
 
     def id(self) -> int:
         """
@@ -98,6 +148,7 @@ class RouterAgent(BaseAgent):
     async def delete_session(self, session_id: str):
         """暂不实现"""
         pass
+
 
 # 全局 RouterAgent 实例
 router_agent = RouterAgent()
