@@ -2,9 +2,12 @@ from datetime import datetime
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 from RouteState import RouteState
 from BaseNodeAgent import BaseNodeAgent
+from tools import query_course_by_id
+
 class ConsultAgent(BaseNodeAgent):
     """
     课程咨询智能体
@@ -34,3 +37,6 @@ class ConsultAgent(BaseNodeAgent):
 
     def system_prompt_params(self):
         return {"now": datetime.now()}
+
+    def tools(self):
+        return [query_course_by_id]

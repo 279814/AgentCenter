@@ -4,6 +4,7 @@ model_file_path = os.path.dirname(current_file_path)
 root_path = os.path.dirname(model_file_path)
 sys.path.insert(0, os.path.dirname(root_path))
 sys.path.insert(0, root_path)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 
 from abc import ABC, abstractmethod

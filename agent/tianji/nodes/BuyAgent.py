@@ -1,10 +1,11 @@
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 from RouteState import RouteState
 from BaseNodeAgent import BaseNodeAgent
-
+from tools import pre_place_order
 
 class BuyAgent(BaseNodeAgent):
     """
@@ -35,3 +36,6 @@ class BuyAgent(BaseNodeAgent):
 
     def system_prompt(self) -> str:
         return self.system_prompt_str
+
+    def tools(self):
+        return [pre_place_order]

@@ -1,4 +1,6 @@
 import os, sys
+
+
 current_file_path = os.path.abspath(__file__)
 model_file_path = os.path.dirname(current_file_path)
 root_path = os.path.dirname(model_file_path)
@@ -8,7 +10,7 @@ sys.path.insert(0, root_path)
 
 import uuid
 import asyncio
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from typing import Optional, AsyncIterable
 
@@ -22,7 +24,10 @@ from BaseAgent import *
 from nodes import *
 from RouteState import RouteState
 from common import *
+from util import JsonUtil
 from config import logger, get_async_pg_pool
+
+from tools.result import CourseInfo, PrePlaceOrder
 
 
 class RouterAgent(BaseAgent):
@@ -120,7 +125,7 @@ class RouterAgent(BaseAgent):
             # 构建 Graph 执行上下文
             config = RunnableConfig(configurable={
                 "thread_id": session_id,
-                "user_token": user_token,  # 将自定义参数传递给子智能体
+                "user_token": user_token, # 将自定义参数传递给子智能体
                 "request_id": request_id  # 将自定义参数传递给子智能体
             })
 
@@ -131,9 +136,12 @@ class RouterAgent(BaseAgent):
             res = self.graph.astream(
                 input=inputs,
                 config=config,
-                subgraphs=True,  # 需要得到子图的输出
+                subgraphs=True, # 需要得到子图的输出
                 stream_mode="messages",
             )
+
+            # 工具调用的执行结果
+            tool_result = {}
 
             try:
                 async for node_info, (message, metadata) in res:
@@ -142,6 +150,21 @@ class RouterAgent(BaseAgent):
 
                     # 主动跳过 IntentAgent 阶段输出
                     if "IntentAgent" in tags:
+                        continue
+
+                    # ToolMessage 是工具输出，不对用户显示
+                    if isinstance(message, ToolMessage):
+                        if not message.status == "success":
+                            continue
+                        _content = message.content
+                        if _content:
+                            if message.name == "query_course_by_id":
+                                course_info = JsonUtil.to_obj(_content, CourseInfo)
+                                tool_result[f"courseInfo_{course_info.id}"] = course_info
+                            elif message.name == "pre_place_order":
+                                order = JsonUtil.to_obj(_content, PrePlaceOrder)
+                                tool_result["prePlaceOrder"] = order
+
                         continue
 
                     # 提取 message 内容
@@ -154,6 +177,10 @@ class RouterAgent(BaseAgent):
                 # 客户端中断，也需要安全关闭流
                 await res.aclose()
                 raise
+
+            # 工具调用结果在结束时统一输出（tag 1003）
+            if tool_result:
+                yield make_sse_event(1003, tool_result)
 
         except Exception as e:
             logger.exception("RouterAgent error")
@@ -173,6 +200,7 @@ class RouterAgent(BaseAgent):
         messages = state_snapshot.values.get("messages", [])
 
         result = []
+        tool_message: Optional[ToolMessage] = None
 
         for message in messages:
             msg_type = ""
@@ -186,6 +214,21 @@ class RouterAgent(BaseAgent):
             # 模型回复消息
             elif isinstance(message, AIMessage):
                 msg_type = "ASSISTANT"
+
+                # 如果 AIMessage 紧随 ToolMessage，恢复工具返回内容
+                if tool_message:
+                    _content = tool_message.content
+                    if tool_message.name == "query_course_by_id":
+                        course_info = JsonUtil.to_obj(_content, CourseInfo)
+                        params = {f"courseInfo_{course_info.id}": course_info}
+                    elif tool_message.name == "pre_place_order":
+                        order = JsonUtil.to_obj(_content, PrePlaceOrder)
+                        params = {"prePlaceOrder":order}
+                    tool_message = None
+
+            # 工具调用消息（需要保留，下一条 AIMessage 会用到）
+            elif isinstance(message, ToolMessage):
+                tool_message = message
 
             # 将有效消息加入结果结构
             if msg_type and content:
