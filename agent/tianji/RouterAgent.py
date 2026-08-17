@@ -8,7 +8,7 @@ sys.path.insert(0, root_path)
 
 import uuid
 import asyncio
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from typing import Optional, AsyncIterable
 
@@ -16,11 +16,11 @@ from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.constants import START, END
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.types import StateSnapshot
 
 from BaseAgent import *
 from nodes import *
 from RouteState import RouteState
-from config import logger
 from common import *
 from config import logger, get_async_pg_pool
 
@@ -161,6 +161,37 @@ class RouterAgent(BaseAgent):
 
         # SSE 最终停止事件（前端用于关闭流）
         yield format_sse_data(STOP_EVENT)
+
+    async def session_detail(self, user_id: int, session_id: str) -> list:
+        """
+        查询指定 session 的消息历史（从 LangGraph 的 Checkpointer 中恢复）。
+
+        同时会自动解析 ToolMessage，用于还原“查询课程/预下单”的参数结构。
+        """
+        config = RunnableConfig(configurable={"thread_id": session_id})
+        state_snapshot: StateSnapshot = await self.graph.aget_state(config)
+        messages = state_snapshot.values.get("messages", [])
+
+        result = []
+
+        for message in messages:
+            msg_type = ""
+            content = message.content
+            params = {}
+
+            # 用户消息
+            if isinstance(message, HumanMessage):
+                msg_type = "USER"
+
+            # 模型回复消息
+            elif isinstance(message, AIMessage):
+                msg_type = "ASSISTANT"
+
+            # 将有效消息加入结果结构
+            if msg_type and content:
+                result.append({"type": msg_type, "content": content, "params": params})
+
+        return result
 
     def id(self) -> int:
         """
