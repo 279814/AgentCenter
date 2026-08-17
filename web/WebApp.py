@@ -5,6 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from routers import auth_router, session_router, chat_router
 from agent import AGENTS
+from config import get_async_pg_pool, close_async_pg_pool
 
 # ========================= 创建 FastAPI 实例 =========================
 app = FastAPI(
@@ -34,6 +35,9 @@ async def startup():
     启动 web 服务时执行：
     - 初始化所有 Agent
     """
+    # 初始化异步数据库连接池
+    await get_async_pg_pool()
+
     # 初始化所有 Agent
     for agent in AGENTS.values():
         await agent.init()
@@ -45,6 +49,8 @@ async def shutdown():
     停止 web 服务时执行：
     - 销毁所有 Agent
     """
+    # 关闭数据库连接池
+    await close_async_pg_pool()
 
     # 销毁所有 Agent
     for agent in AGENTS.values():

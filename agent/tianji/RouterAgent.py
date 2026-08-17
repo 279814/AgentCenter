@@ -15,12 +15,14 @@ from typing import Optional, AsyncIterable
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.constants import START, END
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from BaseAgent import *
 from nodes import *
 from RouteState import RouteState
 from config import logger
 from common import *
+from config import logger, get_async_pg_pool
 
 
 class RouterAgent(BaseAgent):
@@ -46,12 +48,37 @@ class RouterAgent(BaseAgent):
 
     def __init__(self):
         self.graph: Optional[CompiledStateGraph] = None
+        self.checkpointer: Optional[AsyncPostgresSaver] = None  # 用于保存会话状态的 Postgres Checkpointer
 
     async def init(self):
         """
         初始化 RouterAgent
         """
+        # 检查会话记忆所需要的表是否存在
+        await self.check_table()
+
+        # 获取异步数据库连接池实例
+        async_pg_pool = await get_async_pg_pool()
+        # 创建checkpointer是用于实现会话记忆的
+        self.checkpointer = AsyncPostgresSaver(conn=async_pg_pool)
+
         self.init_graph()
+
+    async def check_table(self):
+        """
+        检查数据库中是否存在会话记忆相关的表，如果不存在则创建
+        """
+        async_pg_pool = await get_async_pg_pool()
+        conn = None
+        try:
+            # 先创建一个临时checkpointer，用于检查数据库中相关的表是否存在，如果不存在则创建
+            conn = await async_pg_pool.getconn()
+            await conn.set_autocommit(True)  # 设置自动提交，不使用显式事务块
+            checkpointer = AsyncPostgresSaver(conn=conn)
+            await checkpointer.setup()  # 如果会话记忆相关的表不存在，会自动创建
+        finally:
+            if conn is not None:
+                await async_pg_pool.putconn(conn)
 
     # ---------------- Graph 初始化 ----------------
     def init_graph(self):
@@ -84,7 +111,7 @@ class RouterAgent(BaseAgent):
             builder.add_edge(target, END)
 
         # 编译 Graph，并启用 Checkpointer
-        self.graph = builder.compile()
+        self.graph = builder.compile(checkpointer=self.checkpointer)
 
     async def execute(self, question: str, session_id: str, user_token: str) -> AsyncIterable[str]:
         try:
