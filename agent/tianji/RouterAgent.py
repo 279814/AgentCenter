@@ -199,10 +199,6 @@ class RouterAgent(BaseAgent):
         """
         return 1001
 
-    async def session_detail(self, user_id: int, session_id: str) -> list:
-        """暂不实现"""
-        pass
-
     async def delete_session(self, session_id: str):
         """暂不实现"""
         pass
