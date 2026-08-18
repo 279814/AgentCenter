@@ -76,3 +76,7 @@ ai:
         min: 5 # 最小连接数
         max: 10 # 最大连接数
         url: "postgresql://postgres:itheima123@192.168.150.101:5432/postgres?sslmode=disable"
+redis:
+  host: 192.168.150.101
+  port: 6379
+  password: 123321

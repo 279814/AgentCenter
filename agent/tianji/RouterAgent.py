@@ -122,6 +122,9 @@ class RouterAgent(BaseAgent):
         try:
             request_id = uuid.uuid4().hex
 
+            # 清除停止标记
+            self.reset_stop(session_id)
+
             # 构建 Graph 执行上下文
             config = RunnableConfig(configurable={
                 "thread_id": session_id,
@@ -145,6 +148,11 @@ class RouterAgent(BaseAgent):
 
             try:
                 async for node_info, (message, metadata) in res:
+                    # 检查是否收到停止标记
+                    if self.is_stop(session_id):
+                        await res.aclose()
+                        break
+
                     # 获取消息 tags（例如 IntentAgent）
                     tags = metadata.get("tags", [])
 
@@ -157,13 +165,12 @@ class RouterAgent(BaseAgent):
                         if not message.status == "success":
                             continue
                         _content = message.content
-                        if _content:
-                            if message.name == "query_course_by_id":
-                                course_info = JsonUtil.to_obj(_content, CourseInfo)
-                                tool_result[f"courseInfo_{course_info.id}"] = course_info
-                            elif message.name == "pre_place_order":
-                                order = JsonUtil.to_obj(_content, PrePlaceOrder)
-                                tool_result["prePlaceOrder"] = order
+                        if message.name == "query_course_by_id":
+                            course_info = JsonUtil.to_obj(_content, CourseInfo)
+                            tool_result[f"courseInfo_{course_info.id}"] = course_info
+                        elif message.name == "pre_place_order":
+                            order = JsonUtil.to_obj(_content, PrePlaceOrder)
+                            tool_result["prePlaceOrder"] = order
 
                         continue
 
@@ -183,6 +190,7 @@ class RouterAgent(BaseAgent):
                 yield make_sse_event(1003, tool_result)
 
         except Exception as e:
+            # 如果不是主动停止，输出错误信息（2001）
             logger.exception("RouterAgent error")
             yield make_sse_event(2001, str(e))
 

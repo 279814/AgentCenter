@@ -58,3 +58,24 @@ async def chat(req: ChatRequest):
 
     # 返回智能体生成的流式 SSE
     return stream(agent.execute(req.question, req.sessionId, req.userToken))
+
+
+# ========================= 停止会话接口 =========================
+@chat_router.post("/stop")
+def stop(session_id: str, agent_id: int):
+    """
+    停止指定 session 的对话：
+    - 根据 agent_id 获取智能体
+    - 调用 agent.stop(session_id) 停止该会话
+    """
+    logger.debug(f"【ChatRouter】收到停止请求：sessionId = {session_id}")
+
+    # 获取智能体
+    agent = AGENTS.get(agent_id, None)
+    if agent is None:
+        error_msg = f"Agent not found (agentId={agent_id})"
+        return {"status": "ok", "message": error_msg}
+
+    # 停止会话
+    agent.stop(session_id)
+    return {"status": "ok"}  # 返回成功状态
