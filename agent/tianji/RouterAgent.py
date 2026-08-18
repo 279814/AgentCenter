@@ -29,6 +29,8 @@ from config import logger, get_async_pg_pool
 
 from tools.result import CourseInfo, PrePlaceOrder
 
+from dao import chat_session_dao
+
 
 class RouterAgent(BaseAgent):
     """
@@ -124,6 +126,9 @@ class RouterAgent(BaseAgent):
 
             # 清除停止标记
             self.reset_stop(session_id)
+
+            # 更新会话标题
+            chat_session_dao.update_title(session_id, self.id(), question)
 
             # 构建 Graph 执行上下文
             config = RunnableConfig(configurable={
@@ -250,9 +255,13 @@ class RouterAgent(BaseAgent):
         """
         return 1001
 
+
+    # ---------------- 删除会话 ----------------
     async def delete_session(self, session_id: str):
-        """暂不实现"""
-        pass
+        """
+        删除整个会话的历史记录（通过 Checkpointer 清理）。
+        """
+        await self.checkpointer.adelete_thread(session_id)
 
 
 # 全局 RouterAgent 实例

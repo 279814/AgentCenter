@@ -1,6 +1,10 @@
 import random
 import uuid
 import os, sys
+from datetime import datetime, date
+from sqlalchemy import select, delete, update
+from collections import defaultdict
+
 from sqlalchemy.orm import scoped_session
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -9,6 +13,26 @@ from config import config_manager, get_id, logger
 from BaseDAO import BaseDAO
 from pojo import ChatSession
 
+
+class ChatSessionVO:
+    """会话展示用的 Value Object"""
+
+    def __init__(self, session_id: str, title: str, update_time: datetime):
+        self.session_id = session_id
+        self.title = title
+        self.update_time = update_time
+
+
+# 时间分组常量
+TODAY = "当天"
+LAST_30_DAYS = "最近30天"
+LAST_YEAR = "最近1年"
+MORE_THAN_YEAR = "1年以上"
+
+
+# 标准返回消息
+SUCCESS_MESSAGE = {"status": "ok"}
+NO_CHANGE_MESSAGE = {"status": "ok", "message": "No change"}
 
 class ChatSessionDAO(BaseDAO):
     """
@@ -77,6 +101,137 @@ class ChatSessionDAO(BaseDAO):
 
             for e in selected_examples
         ]
+
+    def update_title(self, session_id: str, agent_id: int, title: str):
+        """
+        更新会话的标题。
+
+        Args:
+            session_id (str): 会话 ID
+            agent_id (int): 智能体 ID
+            title (str): 新标题
+
+        Returns:
+            dict: SUCCESS_MESSAGE 或 NO_CHANGE_MESSAGE
+        """
+
+        def _update(session: scoped_session):
+            stmt = (select(ChatSession)
+                    .where(ChatSession.session_id == session_id)  # type: ignore
+                    .where(ChatSession.agent_id == agent_id))
+            chat_session: ChatSession = session.execute(stmt).scalars().first()
+            if not chat_session:
+                return None
+
+            if not chat_session.title and title:
+                chat_session.title = title[:100]  # 限制长度
+
+            chat_session.update_time = datetime.now()
+            return SUCCESS_MESSAGE
+
+        return self._execute(_update)
+
+    def query_history_session(self, agent_id: int, user_id: int):
+        """
+        查询历史会话，并按时间分组（当天、30天、1年、超过1年）。
+
+        Args:
+            agent_id (int): 智能体 ID
+            user_id (int): 用户 ID
+
+        Returns:
+            dict: 按时间分组的 ChatSessionVO 列表
+        """
+
+        def _query_app_info(session: scoped_session):
+            stmt = (select(ChatSession)
+                    .where(ChatSession.agent_id == agent_id)  # type: ignore
+                    .where(ChatSession.user_id == user_id)
+                    .where(ChatSession.title.isnot(None))
+                    .order_by(ChatSession.update_time.desc())
+                    .limit(30))
+
+            chat_sessions = session.execute(stmt).scalars().all()
+            if not chat_sessions:
+                return {}
+
+            chat_session_vo_list = [
+                ChatSessionVO(
+                    session_id=cs.session_id,
+                    title=cs.title,
+                    update_time=cs.update_time
+                )
+                for cs in chat_sessions
+            ]
+
+            # 按时间分组
+            now = date.today()
+            groups = defaultdict(list)
+            for vo in chat_session_vo_list:
+                days = abs((now - vo.update_time.date()).days)
+                if days == 0:
+                    key = TODAY
+                elif days <= 30:
+                    key = LAST_30_DAYS
+                elif days <= 365:
+                    key = LAST_YEAR
+                else:
+                    key = MORE_THAN_YEAR
+                groups[key].append(vo)
+
+            # 按顺序返回
+            order = [MORE_THAN_YEAR, LAST_YEAR, LAST_30_DAYS, TODAY]
+            return {key: groups[key] for key in order if key in groups}
+
+        return self._execute(_query_app_info)
+
+    def delete_history_session(self, agent_id: int, user_id: int, session_id: str):
+        """
+        删除历史会话。
+
+        Args:
+            agent_id (int): 智能体 ID
+            user_id (int): 用户 ID
+            session_id (str): 会话 ID
+
+        Returns:
+            dict: SUCCESS_MESSAGE 或 NO_CHANGE_MESSAGE
+        """
+
+        def _delete(session: scoped_session):
+            stmt = (delete(ChatSession)
+                    .where(ChatSession.agent_id == agent_id)  # type: ignore
+                    .where(ChatSession.user_id == user_id)
+                    .where(ChatSession.session_id == session_id))
+            res = session.execute(stmt)
+            return SUCCESS_MESSAGE if res.rowcount > 0 else NO_CHANGE_MESSAGE
+
+        return self._execute(_delete)
+
+    def update_history_session(self, agent_id: int, user_id: int, session_id: str, title: str):
+        """
+        更新历史会话标题。
+
+        Args:
+            agent_id (int): 智能体 ID
+            user_id (int): 用户 ID
+            session_id (str): 会话 ID
+            title (str): 新标题
+
+        Returns:
+            dict: SUCCESS_MESSAGE 或 NO_CHANGE_MESSAGE
+        """
+
+        def _update(session: scoped_session):
+            stmt = (update(ChatSession)
+                    .where(ChatSession.agent_id == agent_id)  # type: ignore
+                    .where(ChatSession.user_id == user_id)
+                    .where(ChatSession.session_id == session_id)
+                    .values(title=title[:100]))  # 限制标题长度
+            res = session.execute(stmt)
+            return SUCCESS_MESSAGE if res.rowcount > 0 else NO_CHANGE_MESSAGE
+
+        return self._execute(_update)
 
 
 # 全局 ChatSessionDAO 实例
