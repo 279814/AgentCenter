@@ -9,3 +9,4 @@ from ID import get_id
 from DB import Base, SessionLocal
 from ConnectionPool import *
 from RedisConfig import redis_config
+from NacosConfig import nacos_config
