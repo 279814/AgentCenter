@@ -7,12 +7,17 @@ from routers import auth_router, session_router, chat_router
 from agent import AGENTS
 from config import get_async_pg_pool, close_async_pg_pool, logger, nacos_config, config_manager
 from common import *
+from RequestFilter import RequestFilter
 
 # ========================= 创建 FastAPI 实例 =========================
 app = FastAPI(
     title="Agent Center Web Server",
     description="黑马程序员智能体中心"
 )
+
+# ========================= 中间件 =========================
+# 添加请求过滤器，对请求来源和 token 的有效性进行校验
+app.add_middleware(RequestFilter)
 
 
 # ========================= 异常处理 =========================
