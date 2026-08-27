@@ -28,6 +28,7 @@ class SystemPromptConfig:
     chat_knowledge_message: str = ""
     chat_unknown_message: str = ""
     chat_text_message: str = ""
+    chat_a2a_message = ""
 
     _config_map: dict = field(default_factory=lambda: {
         PROMPT_ROUTE_CHAT_DATA_ID: "chat_route_message",
@@ -37,6 +38,7 @@ class SystemPromptConfig:
         PROMPT_KNOWLEDGE_CHAT_DATA_ID: "chat_knowledge_message",
         PROMPT_UNKNOWN_CHAT_DATA_ID: "chat_unknown_message",
         PROMPT_TEXT_CHAT_DATA_ID: "chat_text_message",
+        PROMPT_A2A_CHAT_DATA_ID: "chat_a2a_message",
     })
 
     _snapshots: dict = field(default_factory=dict)  # 用于存放 MD5 快照
